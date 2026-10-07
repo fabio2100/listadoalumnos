@@ -13,11 +13,12 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    const documents = alumnos.map((alumno: { nombre_y_apellido?: string; dni?: string; celular?: string; va_al_curso?: boolean }) => ({
+    const documents = alumnos.map((alumno: { nombre_y_apellido?: string; dni?: string; celular?: string; va_al_curso?: boolean; observaciones?: string }) => ({
       nombre_y_apellido: String(alumno?.nombre_y_apellido ?? "").trim(),
       dni: String(alumno?.dni ?? "").trim(),
       celular: String(alumno?.celular ?? "").trim(),
       va_al_curso: Boolean(alumno?.va_al_curso),
+      observaciones: String(alumno?.observaciones ?? "").trim(),
       createdAt: new Date(),
     }));
 

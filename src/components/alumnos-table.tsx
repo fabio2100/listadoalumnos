@@ -31,6 +31,7 @@ export type Alumno = {
   dni: string;
   celular: string;
   va_al_curso?: boolean;
+  observaciones?: string;
   isAdded?: boolean;
 };
 
@@ -43,6 +44,7 @@ const defaultForm = {
   dni: "",
   celular: "",
   va_al_curso: true,
+  observaciones: "",
 };
 
 export function AlumnosTable({
@@ -109,7 +111,7 @@ export function AlumnosTable({
     setIsModalOpen(false);
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     if (!formData.nombre_y_apellido.trim() || !formData.dni.trim() || !formData.celular.trim()) {
       return;
     }
@@ -120,8 +122,15 @@ export function AlumnosTable({
       dni: formData.dni.trim(),
       celular: formData.celular.trim(),
       va_al_curso: Boolean(formData.va_al_curso),
+      observaciones: formData.observaciones.trim(),
       isAdded: true,
     };
+
+    const wasSaved = await saveNewAlumnosToDatabase([nuevoAlumno]);
+
+    if (!wasSaved) {
+      return;
+    }
 
     setAgregados((current) => [...current, nuevoAlumno]);
     setEditableAlumnos((current) => [...current, nuevoAlumno]);
@@ -151,9 +160,31 @@ export function AlumnosTable({
     });
   };
 
+  const handleObservacionChange = (id: string, value: string) => {
+    setEditableAlumnos((current) => {
+      const existing = current.find((alumno) => alumno._id === id);
+
+      if (existing) {
+        return current.map((alumno) =>
+          alumno._id === id ? { ...alumno, observaciones: value } : alumno,
+        );
+      }
+
+      const originalAlumno = [...alumnos, ...agregados].find((alumno) => alumno._id === id);
+
+      return [
+        ...current,
+        {
+          ...(originalAlumno ?? { _id: id, nombre_y_apellido: "", dni: "", celular: "" }),
+          observaciones: value,
+        },
+      ];
+    });
+  };
+
   const saveNewAlumnosToDatabase = async (newAlumnos: Alumno[]) => {
     if (!newAlumnos.length) {
-      return;
+      return false;
     }
 
     try {
@@ -168,22 +199,26 @@ export function AlumnosTable({
       if (!response.ok) {
         throw new Error("Error al guardar alumnos.");
       }
+
+      return true;
     } catch (error) {
       console.error(error);
+      return false;
     }
   };
 
-  const exportToXls = (rows: TablaAlumno[]) => {
+  const exportToCsv = (rows: TablaAlumno[]) => {
     const workbook = XLSX.utils.book_new();
     const sheetData = rows.map((alumno) => ({
       nombre_y_apellido: alumno.nombre_y_apellido,
       dni: alumno.dni,
       celular: alumno.celular,
+      observaciones: alumno.observaciones ?? "",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(sheetData);
     XLSX.utils.book_append_sheet(workbook, worksheet, "Alumnos");
-    XLSX.writeFile(workbook, "alumnos-va-al-curso.xlsx");
+    XLSX.writeFile(workbook, "alumnos-va-al-curso.csv");
   };
 
   const exportToPdf = (rows: TablaAlumno[]) => {
@@ -193,8 +228,8 @@ export function AlumnosTable({
     doc.text("Alumnos con curso", 14, 16);
 
     autoTable(doc, {
-      head: [["Nombre y apellido", "DNI", "Celular"]],
-      body: rows.map((alumno) => [alumno.nombre_y_apellido, alumno.dni, alumno.celular]),
+      head: [["Nombre y apellido", "DNI", "Celular", "Observaciones"]],
+      body: rows.map((alumno) => [alumno.nombre_y_apellido, alumno.dni, alumno.celular, alumno.observaciones ?? ""]),
       startY: 24,
       styles: { fontSize: 10 },
       headStyles: { fillColor: [79, 70, 229] },
@@ -203,10 +238,7 @@ export function AlumnosTable({
     doc.save("alumnos-va-al-curso.pdf");
   };
 
-  const handleExport = async (type: "pdf" | "xls") => {
-    const nuevos = agregados.filter((alumno) => alumno.isAdded);
-    await saveNewAlumnosToDatabase(nuevos);
-
+  const handleExport = (type: "pdf" | "csv") => {
     const exportRows = [...allAlumnos]
       .filter((alumno) => alumno.va_al_curso)
       .sort((a, b) => a.nombre_y_apellido.localeCompare(b.nombre_y_apellido, "es", { sensitivity: "base" }));
@@ -216,7 +248,7 @@ export function AlumnosTable({
       return;
     }
 
-    exportToXls(exportRows);
+    exportToCsv(exportRows);
   };
 
   return (
@@ -247,8 +279,8 @@ export function AlumnosTable({
           <Button variant="outlined" color="secondary" onClick={() => void handleExport("pdf")}>
             Guardar PDF
           </Button>
-          <Button variant="outlined" color="secondary" onClick={() => void handleExport("xls")}>
-            Guardar XLS
+          <Button variant="outlined" color="secondary" onClick={() => void handleExport("csv")}>
+            Guardar CSV
           </Button>
         </Box>
       </Box>
@@ -266,6 +298,7 @@ export function AlumnosTable({
                 <TableCell>DNI</TableCell>
                 <TableCell>Celular</TableCell>
                 <TableCell align="center">Va al curso</TableCell>
+                <TableCell>Observaciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -283,12 +316,21 @@ export function AlumnosTable({
                           aria-label={`Va al curso: ${alumno.nombre_y_apellido}`}
                         />
                       </TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          value={alumno.observaciones ?? ""}
+                          onChange={(event) => handleObservacionChange(alumno._id ?? `${alumno.dni}-${index}`, event.target.value)}
+                          placeholder="Observación"
+                          fullWidth
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
 
                   {filteredAddedAlumnos.length > 0 && (
                     <TableRow>
-                      <TableCell colSpan={4} sx={{ py: 1.5, color: "#a5b4fc", fontWeight: 700, letterSpacing: 0.8 }}>
+                      <TableCell colSpan={5} sx={{ py: 1.5, color: "#a5b4fc", fontWeight: 700, letterSpacing: 0.8 }}>
                         Agregados manualmente
                       </TableCell>
                     </TableRow>
@@ -306,12 +348,21 @@ export function AlumnosTable({
                           aria-label={`Va al curso: ${alumno.nombre_y_apellido}`}
                         />
                       </TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          value={alumno.observaciones ?? ""}
+                          onChange={(event) => handleObservacionChange(alumno._id ?? `${alumno.dni}-${index}`, event.target.value)}
+                          placeholder="Observación"
+                          fullWidth
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4, color: "text.secondary" }}>
                     No se encontraron registros.
                   </TableCell>
                 </TableRow>
@@ -348,6 +399,12 @@ export function AlumnosTable({
                 />
               }
               label="Va al curso"
+            />
+            <TextField
+              label="Observaciones"
+              value={formData.observaciones}
+              onChange={handleFormChange("observaciones")}
+              placeholder="Ingrese una observación"
             />
           </Stack>
         </DialogContent>
