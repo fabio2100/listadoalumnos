@@ -3,6 +3,8 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { Box, Typography } from "@mui/material";
 import styles from "./page.module.css";
 
+export const dynamic = "force-dynamic";
+
 async function getAlumnos(): Promise<Alumno[]> {
   try {
     const { db } = await connectToDatabase();
