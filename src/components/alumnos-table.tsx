@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 export type Alumno = {
@@ -59,6 +59,7 @@ export function AlumnosTable({
   const [agregados, setAgregados] = useState<Alumno[]>([]);
   const [formData, setFormData] = useState(defaultForm);
   const [editableAlumnos, setEditableAlumnos] = useState<TablaAlumno[]>([]);
+  const nextLocalId = useRef(0);
 
   const allAlumnos = useMemo<TablaAlumno[]>(() => {
     const baseAlumnos: TablaAlumno[] = [...alumnos, ...agregados].map((alumno) => ({
@@ -117,7 +118,7 @@ export function AlumnosTable({
     }
 
     const nuevoAlumno: TablaAlumno = {
-      _id: `agregado-${Date.now()}`,
+      _id: `agregado-${nextLocalId.current++}`,
       nombre_y_apellido: formData.nombre_y_apellido.trim(),
       dni: formData.dni.trim(),
       celular: formData.celular.trim(),
@@ -176,6 +177,7 @@ export function AlumnosTable({
         ...current,
         {
           ...(originalAlumno ?? { _id: id, nombre_y_apellido: "", dni: "", celular: "" }),
+          va_al_curso: Boolean(originalAlumno?.va_al_curso),
           observaciones: value,
         },
       ];
